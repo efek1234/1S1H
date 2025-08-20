@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <!-- Supabase JS (CDN) -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>1 Soru 1 Hikmet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@300;400;700&family=Noto+Naskh+Arabic:wght@600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root { --accent: #33FF85; }
+      body { font-family: 'Red Hat Display', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial; }
+    </style>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="min-h-screen bg-gradient-to-b from-white to-gray-100 text-black">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const ACCENT = "#33FF85";
+
+
+      /* ====== SUPABASE ENTEGRASYONU (Seçenek B) ====== */
+
+/** 1) İstemciyi başlat */
+const SUPABASE_URL = "https://ydlidsshpmdkwbawhxlv.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkbGlkc3NocG1ka3diYXdoeGx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2NzU5MzksImV4cCI6MjA3MTI1MTkzOX0.DxCxnqWxWFAw6wdeDFhaqmYQTr9gqTjZfx4mwSYo0kk";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/** 2) Bugünün verilerini çek */
+async function fetchDailyFromSupabase(dStr) {
+  // Soru
+  const { data: q, error: eq } = await supabase
+    .from("daily_questions")
+    .select("*")
+    .eq("d", dStr)
+    .single();
+
+  // Ayet
+  const { data: ayah, error: eya } = await supabase
+    .from("daily_ayah")
+    .select("*")
+    .eq("d", dStr)
+    .single();
+
+  // Hadis
+  const { data: hadith, error: eha } = await supabase
+    .from("daily_hadith")
+    .select("*")
+    .eq("d", dStr)
+    .single();
+
+  // Kıssa
+  const { data: qissa, error: eqi } = await supabase
+    .from("daily_qissa")
+    .select("*")
+    .eq("d", dStr)
+    .single();
+
+  return { q, ayah, hadith, qissa, eq, eya, eha, eqi };
+}
+
+/** 3) App içinde state'e bağla (mevcut App bileşeninde çağır) */
+function useDailySupabase() {
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+  const [question, setQuestion] = React.useState(null);
+  const [ayah, setAyah] = React.useState(null);
+  const [hadith, setHadith] = React.useState(null);
+  const [qissa, setQissa] = React.useState(null);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true); setError("");
+        const today = new Date().toISOString().slice(0,10);
+        const { q, ayah, hadith, qissa, eq, eya, eha, eqi } = await fetchDailyFromSupabase(today);
+
+        if (eq)   console.warn("daily_questions:", eq.message);
+        if (eya)  console.warn("daily_ayah:", eya.message);
+        if (eha)  console.warn("daily_hadith:", eha.message);
+        if (eqi)  console.warn("daily_qissa:", eqi.message);
+
+        setQuestion(q || null);
+        setAyah(ayah || null);
+        setHadith(hadith || null);
+        setQissa(qissa || null);
+      } catch (e) {
+        setError(e?.message || "İçerik yüklenemedi.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  return { loading, error, question, ayah, hadith, qissa };
+}
+
+/** 4) App içinde kullan (örnek) */
+// App() bileşeninin başına ekle:
+const { loading: dailyLoading, error: dailyError, question: Q, ayah: AY, hadith: HD, qissa: QS } = useDailySupabase();
+
+/** 5) Kartlara değerleri geçir (render'da) */
+// Günün Sorusu kartı: DB'den geleni kullan; yoksa mevcut fallback kalsın
+<QuestionCard
+  todayContent={{
+    question: Q ? {
+      id: "q-" + (Q.d || new Date().toISOString().slice(0,10)),
+      title: Q.title,
+      answer: (Q.answer || "").toUpperCase(),
+      explain: Q.explain
+    } : {
+      // fallback (DB boşsa)
+      id: "q-fallback",
+      title: "Peygamberimizin babasının adı nedir?",
+      answer: "ABDULLAH",
+      explain: "Hz. Muhammed'in (s.a.s.) babasının adı Abdullah'tır."
+    }
+  }}
+  // Aşağıdaki üç props mevcut QuestionCard API’na göre uyarlanabilir
+  ANSWER={(Q?.answer || "ABDULLAH").toUpperCase()}
+  ANSWER_LEN={(Q?.answer || "ABDULLAH").length}
+  /* ... diğer mevcut props'ların aynı kalması yeterli ... */
+/>
+
+// Ayet kartı (Arapça + ref + meâl)
+{AY && (
+  <CardArabic
+    title="Günün Ayeti"
+    subtitle={AY.ref || ""}
+    ar={AY.ar || ""}
+    tr={AY.tr || ""}
+    onShare={() => shareToWhatsApp(`Günün Ayeti (${AY.ref||""}): ${AY.tr||""}`)}
+  />
+)}
+
+// Hadis kartı
+{HD && (
+  <CardArabic
+    title="Günün Hadis-i Şerifi"
+    subtitle={HD.ref || ""}
+    ar={HD.ar || ""}
+    tr={HD.tr || ""}
+    onShare={() => shareToWhatsApp(`Günün Hadis-i Şerifi (${HD.ref||""}): ${HD.tr||""}`)}
+  />
+)}
+
+// Kıssa kartı
+{QS && (
+  <Card
+    title="Günün Kıssası"
+    subtitle={QS.title || ""}
+    body={QS.tr || ""}
+    onShare={() => shareToWhatsApp(`Günün Kıssası — ${QS.title||""}: ${QS.tr||""}`)}
+  />
+)}
+
+// Yüklenme/Hata mesajları (istersen header altına gösterebilirsin)
+{dailyLoading && <div className="text-xs text-gray-500">İçerikler yükleniyor…</div>}
+{dailyError   && <div className="text-xs text-red-600">{dailyError}</div>}
+
+
+      function pad2(n){ return String(n).padStart(2,"0"); }
+      function formatMiladi(d){
+        return d.toLocaleDateString("tr-TR",{day:"2-digit",month:"long",year:"numeric"});
+      }
+      function gregorianToHijri(date){
+        const GY=date.getUTCFullYear(), GM=date.getUTCMonth()+1, GD=date.getUTCDate();
+        let a=Math.floor((14-GM)/12), y=GY+4800-a, m=GM+12*a-3;
+        let JDN=GD+Math.floor((153*m+2)/5)+365*y+Math.floor(y/4)-Math.floor(y/100)+Math.floor(y/400)-32045;
+        const islamicEpoch=1948439.5; const days=JDN-islamicEpoch;
+        let HYear=Math.floor((30*days+10646)/10631);
+        const firstDayOfHY=islamicEpoch+354*(HYear-1)+Math.floor((3+11*HYear)/30);
+        let HMonth=Math.min(12, Math.ceil((days-(firstDayOfHY-islamicEpoch)+1)/29.5)); if(HMonth<1) HMonth=1;
+        const firstDayOfHM=firstDayOfHY+29*(HMonth-1)+Math.floor((6*HMonth-1)/11);
+        const HDay=Math.floor(JDN-firstDayOfHM+1);
+        const months=["Muharrem","Safer","Rebiülevvel","Rebiülâhir","Cemaziyülevvel","Cemaziyülâhir","Receb","Şaban","Ramazan","Şevval","Zilkade","Zilhicce"];
+        return `${HDay} ${months[HMonth-1]} ${HYear} Hicri`;
+      }
+
+      function App(){
+        const today = React.useMemo(()=>new Date(),[]);
+        const miladiText = formatMiladi(today);
+        const hicriText = gregorianToHijri(new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())));
+
+        const [streak,setStreak] = React.useState(0);
+        const [showStreakInfo,setShowStreakInfo] = React.useState(false);
+
+        React.useEffect(()=>{
+          const todayKey = new Date().toISOString().slice(0,10);
+          const lastVisit = localStorage.getItem("osoh:lastVisit");
+          const lastStreak = parseInt(localStorage.getItem("osoh:streak")||"0",10);
+          const t=new Date(todayKey), y=new Date(t); y.setDate(t.getDate()-1);
+          if(!lastVisit){
+            localStorage.setItem("osoh:lastVisit",todayKey);
+            localStorage.setItem("osoh:streak","1"); setStreak(1);
+          }else if(lastVisit===todayKey){ setStreak(lastStreak||1);
+          }else if(lastVisit===y.toISOString().slice(0,10)){
+            const ns=(lastStreak||0)+1; localStorage.setItem("osoh:lastVisit",todayKey); localStorage.setItem("osoh:streak",String(ns)); setStreak(ns);
+          }else{ localStorage.setItem("osoh:lastVisit",todayKey); localStorage.setItem("osoh:streak","1"); setStreak(1); }
+        },[]);
+
+        return (
+          <div className="min-h-screen flex flex-col">
+            <header className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/60 bg-white/80 border-b border-gray-200">
+              <div className="max-w-md mx-auto px-4 pt-3 pb-2 flex items-center justify-between">
+                <div className="text-lg tracking-tight font-bold">
+                  <span title={`${miladiText} — ${hicriText}`} className="hover:font-extrabold transition-all">
+                    1 Soru <span style={{color:ACCENT}}>1 Hikmet</span>
+                  </span>
+                </div>
+                <div className="relative">
+                  <button onClick={()=>setShowStreakInfo(s=>!s)} className="px-3 py-1 rounded-full text-xs font-bold text-black shadow-md border" style={{borderColor:ACCENT, background:ACCENT}}>
+                    Günlük Seri: {streak} Gün
+                  </button>
+                  {showStreakInfo && (
+                    <div className="absolute right-0 mt-2 w-56 p-3 text-xs bg-white border border-gray-200 rounded-xl shadow-lg">
+                      Her gün giriş yaptıkça seri artar. Atlarsan sıfırlanır. 1/7/30 gün eşiklerinde rozet kazanırsın.
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="max-w-md mx-auto px-4 pb-3 -mt-1">
+                <div className="text-[11px] text-gray-600">{miladiText} · {hicriText}</div>
+              </div>
+              <div className="max-w-md mx-auto px-4 pb-2">
+                <div className="inline-flex items-center gap-2 flex-wrap">
+                  <span className="inline-block border border-green-600 rounded-full px-4 py-1 text-green-700 text-xs font-semibold">Selamünaleyküm</span>
+                  <a href="#ayet" className="text-xs px-3 py-1 rounded-full border border-green-600 text-green-700 hover:bg-green-50 transition">Günün Ayeti</a>
+                  <a href="#hadis" className="text-xs px-3 py-1 rounded-full border border-green-600 text-green-700 hover:bg-green-50 transition">Hadis-i Şerifi</a>
+                  <a href="#kissa" className="text-xs px-3 py-1 rounded-full border border-green-600 text-green-700 hover:bg-green-50 transition">Günün Kıssası</a>
+                  <a href="#vakit" className="text-xs px-3 py-1 rounded-full border border-green-600 text-green-700 hover:bg-green-50 transition">Namaz Vakitleri</a>
+                </div>
+              </div>
+            </header>
+
+            <main className="flex-1 max-w-md w-full mx-auto p-4 space-y-4 pb-16">
+              <QuestionCard ACCENT={ACCENT} />
+              <AyetCard id="ayet" />
+              <HadisCard id="hadis" />
+              <KissaCard id="kissa" />
+              <PrayerTimes id="vakit" ACCENT={ACCENT} />
+            </main>
+          </div>
+        );
+      }
+
+      function QuestionCard({ACCENT}){
+        const todayKey = new Date().toISOString().slice(0,10);
+        const question = {
+          id: "q-"+todayKey,
+          title: "Peygamberimizin babasının adı nedir?",
+          answer: "ABDULLAH",
+          explain: "Hz. Muhammed'in (s.a.s.) babasının adı Abdullah'tır."
+        };
+        const hikmetler = [
+          "Sabır, imanın yarısıdır. — Hz. Ali",
+          "İnsanların en hayırlısı, insanlara faydalı olandır. — Hadis",
+          "Azıcık iyilik, çokça huzur getirir. — Atasözü",
+          "Teslimiyet, ateşi bile serin kılar. — Hz. İbrahim Kıssası"
+        ];
+        const todaysHikmet = hikmetler[new Date().getDate() % hikmetler.length];
+
+        const [state,setState] = React.useState(()=>{
+          const s = localStorage.getItem("osoh:answered:"+question.id);
+          if(!s) return {answered:false, attempt:"", triesLeft:2, isCorrect:false, reveal:false};
+          try { return JSON.parse(s); } catch { return {answered:false, attempt:"", triesLeft:2, isCorrect:false, reveal:false}; }
+        });
+
+        function save(next){
+          localStorage.setItem("osoh:answered:"+question.id, JSON.stringify(next));
+          setState(next);
+        }
+        function onChange(e){
+          const v = (e.target.value||"").toUpperCase().replace(/[^A-ZĞİŞÇÖÜIİ]/g,"").slice(0, question.answer.length);
+          setState(prev=>({...prev, attempt:v}));
+        }
+        function submit(){
+          if(state.answered) return;
+          if((state.attempt||"").length !== question.answer.length) return;
+          const isCorrect = state.attempt === question.answer;
+          const triesLeft = state.triesLeft - 1;
+          if(isCorrect){
+            save({answered:true, attempt:state.attempt, triesLeft, isCorrect:true, reveal:false});
+          }else if(triesLeft<=0){
+            save({answered:true, attempt:state.attempt, triesLeft:0, isCorrect:false, reveal:true});
+          }else{
+            setState(prev=>({...prev, attempt:"", triesLeft}));
+          }
+        }
+        function giveUp(){
+          if(state.answered) return;
+          save({answered:true, attempt:state.attempt, triesLeft:0, isCorrect:false, reveal:true});
+        }
+        function shareNonSpoiler(){
+          const text = "Ben bugünün sorusunu doğru bildim! Hikmeti görmek için sen de 1 Soru 1 Hikmet'e gel 🌿";
+          const url = "https://wa.me/?text="+encodeURIComponent(text);
+          window.open(url, "_blank");
+        }
+
+        return (
+          <section className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-4">
+              <div className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Günün Sorusu</div>
+              <h1 className="mt-1 text-base font-bold leading-snug">{question.title}</h1>
+              <input
+                value={state.attempt||""}
+                onChange={onChange}
+                className="mt-3 w-full px-4 py-3 rounded-xl border border-gray-200 text-base tracking-widest text-center font-bold"
+                placeholder={`⟵ ${question.answer.length} harf`}
+                disabled={state.answered}
+              />
+              {!state.answered && (
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                  <button onClick={submit} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border bg-white text-sm font-semibold" style={{borderColor:ACCENT}}>
+                    Cevapla ({state.triesLeft} hak)
+                  </button>
+                  <button onClick={giveUp} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border bg-white text-sm font-semibold" style={{borderColor:ACCENT}}>
+                    Cevabı Öğren
+                  </button>
+                </div>
+              )}
+              {state.answered && (
+                <div className="mt-3 p-3 rounded-xl border text-sm" style={{borderColor: state.isCorrect? '#16a34a':'#ef4444', background: state.isCorrect? '#f0fdf4':'#fef2f2'}}>
+                  <div className="font-bold mb-1">
+                    {state.isCorrect ? "Maşallah! Doğru bildin, tebrikler." : (state.reveal ? `Bilemedin ama öğrendin: Cevap ${question.answer}. Yarın yine buluşalım.` : "Bilemedin ama öğrendin.")}
+                  </div>
+                  <div className="text-gray-700">{question.explain}</div>
+                  {state.isCorrect && (
+                    <div className="mt-3">
+                      <div className="text-gray-800">Bugünün Hikmeti:</div>
+                      <blockquote className="mt-2 italic">“{todaysHikmet}”</blockquote>
+                      <div className="mt-3 flex justify-end">
+                        <button onClick={shareNonSpoiler} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-xs font-semibold" style={{borderColor:ACCENT}}>
+                          Hikmeti Paylaş (Spoiler yok)
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="h-1 w-full" style={{background:ACCENT}}></div>
+          </section>
+        );
+      }
+
+      function AyetCard(props){
+        return (
+          <section id={props.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Günün Ayeti</div>
+            <p className="mt-2 text-xl leading-relaxed text-[#111]" style={{fontFamily:"'Noto Naskh Arabic', serif"}} dir="rtl">
+              فَإِنَّ مَعَ الْعُسْرِ يُسْرًا
+            </p>
+            <p className="mt-2 text-sm text-gray-800">Şüphesiz zorlukla beraber bir kolaylık vardır. (İnşirah, 6)</p>
+          </section>
+        );
+      }
+
+      function HadisCard(props){
+        return (
+          <section id={props.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Günün Hadis-i Şerifi</div>
+            <p className="mt-2 text-xl" style={{fontFamily:"'Noto Naskh Arabic', serif"}} dir="rtl">يَسِّرُوا وَلَا تُعَسِّرُوا وَبَشِّرُوا وَلَا تُنَفِّرُوا</p>
+            <p className="mt-2 text-sm text-gray-800">Kolaylaştırınız, zorlaştırmayınız; müjdeleyiniz, nefret ettirmeyiniz.</p>
+          </section>
+        );
+      }
+
+      function KissaCard(props){
+        return (
+          <section id={props.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Günün Kıssası</div>
+            <div className="mt-0.5 text-sm font-bold">Güvercin ve Pınar</div>
+            <p className="mt-2 text-sm leading-relaxed text-gray-800">Susayan bir yolcu pınarda su içerken küçük bir güvercine denk gelir; kabını paylaşır. Yıllar sonra yolunu kaybedince aynı güvercin onu şehre kadar götürür.</p>
+          </section>
+        );
+      }
+
+      function PrayerTimes({id, ACCENT}){
+        const [city,setCity] = React.useState("İstanbul");
+        const [timings,setTimings] = React.useState(null);
+        const [loading,setLoading] = React.useState(false);
+        const [error,setError] = React.useState("");
+
+        const citiesTR = React.useMemo(()=>[
+          "Adana","Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ankara","Antalya","Ardahan","Artvin","Aydın","Balıkesir","Bartın","Batman","Bayburt","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Düzce","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkâri","Hatay","Iğdır","Isparta","İstanbul","İzmir","Kahramanmaraş","Karabük","Karaman","Kars","Kastamonu","Kayseri","Kilis","Kırıkkale","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Mardin","Mersin","Muğla","Muş","Nevşehir","Niğde","Ordu","Osmaniye","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Şanlıurfa","Şırnak","Tekirdağ","Tokat","Trabzon","Tunceli","Uşak","Van","Yalova","Yozgat","Zonguldak"
+        ].sort((a,b)=>a.localeCompare(b,'tr')) ,[]);
+
+        async function fetchByCity(c){
+          try{
+            setLoading(true); setError("");
+            const url = `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(c)}&country=Turkey&method=13&school=1`;
+            const r = await fetch(url);
+            const j = await r.json();
+            if(j.code!==200) throw new Error(j?.data||"Bilinmeyen hata");
+            setTimings(j.data.timings||null);
+          }catch(e){
+            setError(e?.message||"Vakitler alınamadı"); setTimings(null);
+          }finally{ setLoading(false); }
+        }
+
+        React.useEffect(()=>{ fetchByCity(city); },[city]);
+
+        const five = timings ? {Sabah:timings.Fajr, Öğle:timings.Dhuhr, İkindi:timings.Asr, Akşam:timings.Maghrib, Yatsı:timings.Isha} : null;
+
+        return (
+          <section id={id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">Namaz Vakitleri</div>
+            <div className="mt-2 flex gap-2 items-center">
+              <select value={city} onChange={(e)=>setCity(e.target.value)} className="border rounded px-3 py-2 text-sm">
+                {citiesTR.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button onClick={()=>fetchByCity(city)} className="px-3 py-2 rounded-xl border text-sm font-semibold" style={{borderColor:ACCENT}}>Şehri Seç</button>
+            </div>
+            {loading && <div className="mt-2 text-sm text-gray-500">Yükleniyor…</div>}
+            {error && <div className="mt-2 text-sm text-red-600">{error}</div>}
+            {five && !loading && !error && (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
+                {Object.entries(five).map(([k,v])=>(
+                  <div key={k} className="rounded-xl border p-3" style={{borderColor:"#e5e7eb"}}>
+                    <div className="text-gray-500 text-xs">{k}</div>
+                    <div className="font-semibold">{v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<App/>);
+    </script>
+  </body>
+</html>
